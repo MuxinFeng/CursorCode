@@ -4,74 +4,10 @@ import * as vscode from "vscode";
 const axios = require("axios").default;
 const path = require("path");
 const fs = require("fs");
-import { v4 as uuidv4 } from "uuid"; 
+import { v4 as uuidv4 } from "uuid";
 
 import { loginCursor } from "./auth";
-
-type ResponseType =
-  | "idk"
-  | "freeform"
-  | "generate"
-  | "edit"
-  | "chat_edit"
-  | "lsp_edit";
-
-interface CodeBlock {
-  fileId: number;
-  text: string;
-  startLine: number;
-  endLine: number;
-}
-
-type CodeSymbolType = "import" | "function" | "class" | "variable";
-interface CodeSymbol {
-  fileName: string;
-  name: string;
-  type: CodeSymbolType;
-}
-
-interface UserMessage {
-  sender: "user";
-  conversationId: string;
-  message: string;
-  msgType: ResponseType;
-  sentAt: number;
-  currentFile: string | null;
-  precedingCode: string | null;
-  procedingCode: string | null;
-  currentSelection: string | null;
-  // Other pieces of info encoded
-  otherCodeBlocks: CodeBlock[];
-  codeSymbols: CodeSymbol[];
-  selection: { from: number; to: number } | null;
-  maxOrigLine?: number;
-}
-
-type BotMessageType =
-  | "edit"
-  | "continue"
-  | "markdown"
-  | "multifile"
-  | "location"
-  | "interrupt"
-  | "chat_edit"
-  | "lsp_edit";
-
-interface BotMessage {
-  sender: "bot";
-  sentAt: number;
-  type: BotMessageType;
-  conversationId: string;
-  message: string;
-  currentFile: string | null;
-  lastToken: string;
-  finished: boolean;
-  interrupted: boolean;
-  rejected?: boolean;
-  hitTokenLimit?: boolean;
-  maxOrigLine?: number;
-  useDiagnostics?: boolean | number;
-}
+import { BotMessage, ResponseType, UserMessage } from "./types/common";
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -155,9 +91,9 @@ class CursorWebviewViewProvider implements vscode.WebviewViewProvider {
   private url: string = "https://aicursor.com";
   public message: string = "";
   public msgType: ResponseType = "freeform";
-  private contextType: string = 'copilot';
+  private contextType: string = "copilot";
 
-  private accessToken: string = '';
+  private accessToken: string = "";
 
   public pasteOnClick: boolean = true;
   public keepConversation: boolean = true;
@@ -171,9 +107,9 @@ class CursorWebviewViewProvider implements vscode.WebviewViewProvider {
     private readonly extensionPath: string
   ) {
     // 获取配置项
-    const config = vscode.workspace.getConfiguration('cursorcode');
+    const config = vscode.workspace.getConfiguration("cursorcode");
     // 获取配置项中的文本
-    const cursorToken:string = config.get('accessToken') as string;
+    const cursorToken: string = config.get("accessToken") as string;
     // 显示文本
     this.accessToken = cursorToken;
     // console.log(cursorToken)
@@ -218,29 +154,41 @@ class CursorWebviewViewProvider implements vscode.WebviewViewProvider {
           this.msgType = "freeform";
           this.message = data.value;
           this.conversation();
-          break
+          break;
         }
         case "clear": {
           this.userMessages = [];
           this.botMessages = [];
           this.conversationId = "";
-          break
+          break;
         }
         case "loginCursor": {
-          const loginData: any = await loginCursor()
-          if(loginData){
+          const loginData: any = await loginCursor();
+          if (loginData) {
             this.accessToken = loginData.accessToken;
-             // 获取配置项
-            const config = vscode.workspace.getConfiguration('cursorcode');
+            // 获取配置项
+            const config = vscode.workspace.getConfiguration("cursorcode");
             // 将文本保存到配置项里面
-            config.update('accessToken', loginData.accessToken, vscode.ConfigurationTarget.Global);
-            config.update('refreshToken', loginData.refreshToken, vscode.ConfigurationTarget.Global);
-            config.update('challenge', loginData.challenge, vscode.ConfigurationTarget.Global);
+            config.update(
+              "accessToken",
+              loginData.accessToken,
+              vscode.ConfigurationTarget.Global
+            );
+            config.update(
+              "refreshToken",
+              loginData.refreshToken,
+              vscode.ConfigurationTarget.Global
+            );
+            config.update(
+              "challenge",
+              loginData.challenge,
+              vscode.ConfigurationTarget.Global
+            );
             vscode.window.showInformationMessage("登录成功");
-          }else {
+          } else {
             vscode.window.showInformationMessage("登录失败");
           }
-          break
+          break;
         }
       }
     });
@@ -254,7 +202,7 @@ class CursorWebviewViewProvider implements vscode.WebviewViewProvider {
     const editor = vscode.window.activeTextEditor!;
     if (!editor) {
       vscode.window.showWarningMessage(
-        "CursorCode：对话前请先打开一个代码文件!"
+        "cursorcode：对话前请先打开一个代码文件!"
       );
       return false;
     }
@@ -385,7 +333,7 @@ class CursorWebviewViewProvider implements vscode.WebviewViewProvider {
     try {
       response = await axios.request(reqData);
     } catch (e: any) {
-      if (e.response.status==401) {
+      if (e.response.status == 401) {
         this._view?.webview.postMessage({
           type: "showInput",
           value: "请先点击上方的登录按钮进行登录后使用",
@@ -560,7 +508,7 @@ class CursorWebviewViewProvider implements vscode.WebviewViewProvider {
       //   console.error("异常断开");
       //   return;
       // }
-      if(isInterrupt) {
+      if (isInterrupt) {
         // console.log(newContent)
         // this.continue(newContent);
         return;
@@ -707,7 +655,7 @@ class CursorWebviewViewProvider implements vscode.WebviewViewProvider {
         <p>快捷键一：在代码框中按下Ctrl+Alt+Y弹出代码生成/优化命令框</p>
         <p>快捷键二：在代码框中按下Ctrl+Alt+U弹出对话消息发送框</p>
         <p>Tips：如果出现空白，没有回答内容的情况，请直接点击停止响应</p>
-        <p>Github：https://github.com/Meteo-Pig/CursorCode</p>
+        <p>Github：https://github.com/Meteo-Pig/cursorcode</p>
         <p style="text-align: center;"><button id="login-btn">登录Cursor账户</button></p>
       </div>
 
